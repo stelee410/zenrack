@@ -12,8 +12,9 @@ const XYPerformancePad: React.FC<{
   if (!isOpen) return null;
 
   const padRef = useRef<HTMLDivElement>(null);
-  const [isCtrlPressed, setIsCtrlPressed] = useState(false);
+  const [isCtrlMode, setIsCtrlMode] = useState(false);
   const initialParamsRef = useRef<{ frequency: number; volume: number; harmonicsIntensity: number } | null>(null);
+  const ctrlKeyPressedRef = useRef(false); // 防止重复触发
 
   // 保存打开 pad 时的初始参数
   useEffect(() => {
@@ -30,25 +31,39 @@ const XYPerformancePad: React.FC<{
     }
   }, [isOpen, params.frequency, params.volume, params.harmonicsIntensity]);
 
+  // 处理 Ctrl 键切换模式
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'Control') {
-        setIsCtrlPressed(true);
+      
+      // 检测 Ctrl 键按下（防止重复触发）
+      if ((e.key === 'Control' || e.ctrlKey) && !ctrlKeyPressedRef.current) {
+        ctrlKeyPressedRef.current = true;
+        
+        // 切换 Ctrl 模式
+        if (!isCtrlMode) {
+          // 激活 Ctrl 模式：鼠标移动即可控制
+          setIsCtrlMode(true);
+        } else {
+          // 关闭 Ctrl 模式：重置到初始值
+          setIsCtrlMode(false);
+          
+          // 恢复初始位置
+          if (initialParamsRef.current) {
+            onUpdate({
+              frequency: initialParamsRef.current.frequency,
+              volume: initialParamsRef.current.volume,
+              harmonicsIntensity: initialParamsRef.current.harmonicsIntensity
+            });
+          }
+        }
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Control') {
-        setIsCtrlPressed(false);
-        // 恢复初始位置
-        if (initialParamsRef.current) {
-          onUpdate({
-            frequency: initialParamsRef.current.frequency,
-            volume: initialParamsRef.current.volume,
-            harmonicsIntensity: initialParamsRef.current.harmonicsIntensity
-          });
-        }
+      // 重置 Ctrl 键状态，允许下次按下时触发
+      if (e.key === 'Control' || !e.ctrlKey) {
+        ctrlKeyPressedRef.current = false;
       }
     };
 
@@ -58,7 +73,7 @@ const XYPerformancePad: React.FC<{
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [onClose, onUpdate]);
+  }, [onClose, onUpdate, isCtrlMode]);
 
   const handleInteraction = (clientX: number, clientY: number) => {
     if (!padRef.current) return;
@@ -83,8 +98,11 @@ const XYPerformancePad: React.FC<{
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
-    // 如果按住 Ctrl，直接跟随鼠标；否则需要按住左键
-    if (isCtrlPressed || e.buttons === 1) {
+    // 如果 Ctrl 模式激活，鼠标移动即可控制（不需要按下）
+    if (isCtrlMode) {
+      handleInteraction(e.clientX, e.clientY);
+    } else if (e.buttons === 1) {
+      // 普通模式：需要按住左键
       handleInteraction(e.clientX, e.clientY);
     }
   };
@@ -111,7 +129,7 @@ const XYPerformancePad: React.FC<{
                <h2 className="text-sky-400 font-black tracking-[0.25em] uppercase text-xs leading-none">{title} PRECISION PAD</h2>
                <p className="text-[7px] text-slate-500 uppercase font-black mt-1.5 tracking-widest flex items-center gap-2">
                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
-                 ACTIVE EXPRESSION MODE
+                 {isCtrlMode ? 'FREE MOVE MODE' : 'ACTIVE EXPRESSION MODE'}
                </p>
              </div>
           </div>
@@ -180,6 +198,14 @@ const XYPerformancePad: React.FC<{
                <span>PITCH_X [40 - 2000Hz]</span>
                <span>GAIN_Y [0.0 - 1.0]</span>
             </div>
+
+            {/* Ctrl 模式激活指示器 */}
+            {isCtrlMode && (
+              <div className="absolute top-3 left-3 flex items-center gap-2 bg-sky-500/20 border border-sky-500/50 px-3 py-1.5 rounded backdrop-blur-sm">
+                <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></div>
+                <span className="text-[7px] font-mono text-sky-400 uppercase tracking-wider">FREE MOVE</span>
+              </div>
+            )}
           </div>
         </div>
         
