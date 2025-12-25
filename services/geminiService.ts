@@ -119,3 +119,47 @@ export async function generateSynthConfig(prompt: string) {
     return null;
   }
 }
+
+export async function generateStrudelCode(currentCode: string, prompt: string): Promise<string | null> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are an expert in Strudel live coding language. Given the current Strudel code and a user's request, generate improved or modified Strudel code.
+
+Current code:
+\`\`\`
+${currentCode || '// Empty code'}
+\`\`\`
+
+User request: "${prompt}"
+
+Requirements:
+1. Return ONLY the complete Strudel code, without any explanation or markdown formatting
+2. If the current code has setcps(), preserve it or update it appropriately
+3. Maintain the overall structure and style of the code when possible
+4. Generate valid Strudel code that follows best practices
+5. Make sure the code is complete and runnable
+
+Generate the new Strudel code:`,
+    });
+
+    const text = response.text;
+    if (!text) return null;
+    
+    // 清理可能的 markdown 代码块标记
+    let cleanedCode = text.trim();
+    if (cleanedCode.startsWith('```')) {
+      // 移除开头的 ``` 和可能的语言标记
+      cleanedCode = cleanedCode.replace(/^```[\w]*\n?/, '');
+    }
+    if (cleanedCode.endsWith('```')) {
+      // 移除结尾的 ```
+      cleanedCode = cleanedCode.replace(/\n?```$/, '');
+    }
+    
+    return cleanedCode.trim();
+  } catch (error) {
+    console.error("AI Strudel Code Generation Error:", error);
+    return null;
+  }
+}
