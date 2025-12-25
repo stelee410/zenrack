@@ -1,0 +1,8 @@
+
+{
+  "name": "ZenRack Modular Synth",
+  "description": "A healing-oriented semi-modular rack synthesizer featuring an 808 drum machine, AI-powered chord pads, ambient environments, and vision-controlled modulation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
