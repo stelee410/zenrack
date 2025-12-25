@@ -49,7 +49,8 @@ const Header: React.FC<HeaderProps> = ({
                className={`w-8 h-6 rounded flex items-center justify-center transition-all ${isRecording ? 'bg-rose-600 text-white led animate-pulse' : 'text-slate-400 hover:bg-slate-600'} ${isEncoding ? 'opacity-50 cursor-wait' : ''}`} 
                title={isEncoding ? "Encoding..." : `Record Output (${recFormat.toUpperCase()})`}
              >
-               {isEncoding ? <i className="fas fa-spinner fa-spin text-[8px]"/> : <i className={`fas fa-circle text-[8px] ${isRecording ? 'text-white' : 'text-rose-500'}`}/></button>
+               {isEncoding ? <i className="fas fa-spinner fa-spin text-[8px]"/> : <i className={`fas fa-circle text-[8px] ${isRecording ? 'text-white' : 'text-rose-500'}`}/>}
+             </button>
              {!isRecording && (
                <select 
                  value={recFormat} 

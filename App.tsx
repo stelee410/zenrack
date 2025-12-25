@@ -12,7 +12,6 @@ import AstralPads from './components/modules/AstralPads';
 import ZenEditor from './components/modules/ZenEditor';
 import BiomesModule from './components/modules/BiomesModule';
 import GeneratorModule from './components/modules/GeneratorModule';
-import VisionLink from './components/modules/VisionLink';
 import MixerPanel from './components/MixerPanel';
 
 type RecordingFormat = 'webm' | 'wav';
@@ -65,8 +64,6 @@ const App: React.FC = () => {
   const [genEffects, setGenEffects] = useState(Array(3).fill(null).map(() => ({ reverb: 0.2, echo: 0.1 })));
   const [genActiveTab, setGenActiveTab] = useState<('OSC' | 'LFO' | 'ENV')[]>(['OSC', 'OSC', 'OSC']);
 
-  // Vision State
-  const [visionActive, setVisionActive] = useState(false);
 
   const [mixerVolumes, setMixerVolumes] = useState<number[]>([1, 1, 1, 1, 1, 1]); 
   const [mixerPanning, setMixerPanning] = useState<number[]>([0, 0, 0, 0, 0, 0]);
@@ -94,7 +91,6 @@ const App: React.FC = () => {
   const handlePanic = () => {
     setIsPlaying(false); setChordIsPlaying(false); setEnvIsPlaying(false);
     setGenParams(prev => prev.map(g => ({ ...g, active: false })));
-    setVisionActive(false);
     audioEngine.panic();
   };
 
@@ -299,25 +295,6 @@ const App: React.FC = () => {
     setIsChordAiLoading(false);
   };
 
-  // Process Vision Modulation
-  const handleVisionModulation = (motion: { x: number, y: number, intensity: number }) => {
-    if (!visionActive) return;
-
-    // Modulate Gen-1 Pitch based on Y
-    const baseFreq = genParams[0].baseFrequency;
-    const targetFreq = baseFreq * (1 + motion.y);
-    updateGen(0, { 
-      frequency: targetFreq,
-      harmonicsIntensity: motion.intensity * 0.8
-    });
-
-    // Modulate Pad Filter based on Intensity
-    setPadParams(prev => ({
-      ...prev,
-      lpf: 400 + (motion.intensity * 18000),
-      reso: 1 + (motion.intensity * 10)
-    }));
-  };
 
   const toggleViewMode = () => {
     setViewMode(v => v === 'rack' ? 'editor' : 'rack');
@@ -378,7 +355,7 @@ const App: React.FC = () => {
           isEnvLoading={isEnvLoading} setIsEnvLoading={setIsEnvLoading}
         />
 
-        {[0, 1].map(idx => (
+        {[0, 1, 2].map(idx => (
            <GeneratorModule 
              key={idx} 
              idx={idx} 
@@ -391,12 +368,6 @@ const App: React.FC = () => {
              onUpdateEffects={(patch) => { const n = [...genEffects]; n[idx] = { ...n[idx], ...patch }; setGenEffects(n); }}
            />
         ))}
-
-        <VisionLink 
-          active={visionActive} 
-          onToggle={setVisionActive} 
-          onModulate={handleVisionModulation} 
-        />
       </div>
 
       <MixerPanel 
