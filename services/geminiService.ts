@@ -1,9 +1,24 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// 获取 API Key，支持多种环境变量名称
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.error(
+    "❌ GEMINI_API_KEY 未设置！\n" +
+    "请在项目根目录创建 .env.local 文件，并添加：\n" +
+    "GEMINI_API_KEY=your_api_key_here"
+  );
+}
+
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export async function generateHealingChords(mood: string): Promise<string[]> {
+  if (!ai) {
+    console.error("Gemini API 未初始化：缺少 API Key");
+    return ["Cmaj9", "Am11", "F6/9", "G13sus4", "Cadd9", "Em7", "Dm9", "G7"];
+  }
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
@@ -52,6 +67,10 @@ export async function generateHealingChords(mood: string): Promise<string[]> {
 }
 
 export async function generateSynthConfig(prompt: string) {
+  if (!ai) {
+    console.error("Gemini API 未初始化：缺少 API Key");
+    return null;
+  }
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
@@ -121,6 +140,10 @@ export async function generateSynthConfig(prompt: string) {
 }
 
 export async function generateStrudelCode(currentCode: string, prompt: string): Promise<string | null> {
+  if (!ai) {
+    console.error("Gemini API 未初始化：缺少 API Key");
+    return null;
+  }
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
