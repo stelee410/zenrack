@@ -7,9 +7,11 @@ interface ZenEditorProps {
   zenText: string;
   bpm: number;
   isPlaying: boolean;
+  onCodeChange?: (code: string) => void;
+  initialCode?: string;
 }
 
-const ZenEditor: React.FC<ZenEditorProps> = ({ bpm, isPlaying }) => {
+const ZenEditor: React.FC<ZenEditorProps> = ({ bpm, isPlaying, onCodeChange, initialCode }) => {
   const [isStrudelPlaying, setIsStrudelPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -252,7 +254,7 @@ stack(
   }, []);
 
   // 更新整个代码
-  const updateFullCode = useCallback((newCode: string): boolean => {
+  const updateFullCode = useCallback((newCode: string, notifyChange: boolean = true): boolean => {
     if (!iframeRef.current) return false;
 
     try {
@@ -261,12 +263,20 @@ stack(
 
       if (!iframeDoc) {
         // 回退到 URL 方法
-        return updateCodeViaUrl(newCode);
+        const result = updateCodeViaUrl(newCode);
+        if (result && notifyChange && onCodeChange) {
+          onCodeChange(newCode);
+        }
+        return result;
       }
 
       const codeContainer = iframeDoc.querySelector('#code') as HTMLElement;
       if (!codeContainer) {
-        return updateCodeViaUrl(newCode);
+        const result = updateCodeViaUrl(newCode);
+        if (result && notifyChange && onCodeChange) {
+          onCodeChange(newCode);
+        }
+        return result;
       }
 
       const cmEditor = codeContainer.querySelector('.cm-editor') as HTMLElement;
@@ -286,6 +296,9 @@ stack(
               insert: newCode
             }
           });
+          if (notifyChange && onCodeChange) {
+            onCodeChange(newCode);
+          }
           return true;
         }
         
@@ -299,16 +312,27 @@ stack(
             cmContent.dispatchEvent(new Event(eventType, { bubbles: true }));
           });
           
+          if (notifyChange && onCodeChange) {
+            onCodeChange(newCode);
+          }
           return true;
         }
       }
 
-      return updateCodeViaUrl(newCode);
+      const result = updateCodeViaUrl(newCode);
+      if (result && notifyChange && onCodeChange) {
+        onCodeChange(newCode);
+      }
+      return result;
     } catch (error) {
       console.error('Error updating code:', error);
-      return updateCodeViaUrl(newCode);
+      const result = updateCodeViaUrl(newCode);
+      if (result && notifyChange && onCodeChange) {
+        onCodeChange(newCode);
+      }
+      return result;
     }
-  }, [updateCodeViaUrl]);
+  }, [updateCodeViaUrl, onCodeChange]);
 
   // AI 生成代码
   const handleAiGenerate = useCallback(async () => {
@@ -553,6 +577,12 @@ stack(
           setTimeout(() => {
             injectScrollbarStyles();
           }, 300);
+          // 如果提供了初始代码，在iframe准备好后设置
+          if (initialCode && initialCode.trim()) {
+            setTimeout(() => {
+              updateFullCode(initialCode, false);
+            }, 500);
+          }
           break;
 
         case 'strudel-playing':
@@ -562,6 +592,9 @@ stack(
         // 处理代码响应（如果 Strudel 支持）
         case 'code-response':
           // 这个会在 handleSyncBpm 中处理
+          if (code && onCodeChange) {
+            onCodeChange(code);
+          }
           break;
       }
     };
@@ -570,7 +603,32 @@ stack(
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [injectScrollbarStyles]);
+  }, [injectScrollbarStyles, initialCode, updateFullCode, onCodeChange]);
+
+  // 监听代码变化并通知父组件
+  useEffect(() => {
+    if (!isReady || !onCodeChange) return;
+    
+    const interval = setInterval(() => {
+      const currentCode = getCurrentCode();
+      if (currentCode && currentCode.trim()) {
+        onCodeChange(currentCode);
+      }
+    }, 2000); // 每2秒检查一次代码变化
+
+    return () => clearInterval(interval);
+  }, [isReady, onCodeChange, getCurrentCode]);
+
+  // 当initialCode变化时更新代码
+  useEffect(() => {
+    if (initialCode && initialCode.trim() && isReady) {
+      const currentCode = getCurrentCode();
+      // 只有当代码不同时才更新
+      if (currentCode !== initialCode) {
+        updateFullCode(initialCode, false);
+      }
+    }
+  }, [initialCode, isReady, getCurrentCode, updateFullCode]);
 
   // 监听 ESC 键退出全屏
   useEffect(() => {
