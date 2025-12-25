@@ -46,30 +46,126 @@
             border-radius: 2px;
         }
         
-        /* ZenEditor iframe scrollbar styling */
+        /* ZenEditor iframe scrollbar styling - 美化版本 */
         .zen-editor-iframe-container {
             scrollbar-width: thin;
-            scrollbar-color: rgba(56, 189, 248, 0.5) rgba(15, 23, 42, 0.8);
+            scrollbar-color: rgba(56, 189, 248, 0.6) rgba(15, 23, 42, 0.3);
         }
         
         .zen-editor-iframe-container::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
         }
         
         .zen-editor-iframe-container::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.8);
-            border-radius: 4px;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 6px;
+            margin: 2px;
         }
         
         .zen-editor-iframe-container::-webkit-scrollbar-thumb {
-            background: rgba(56, 189, 248, 0.5);
-            border-radius: 4px;
-            border: 1px solid rgba(56, 189, 248, 0.2);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.6), rgba(147, 51, 234, 0.5));
+            border-radius: 6px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.1), 
+                        0 0 4px rgba(56, 189, 248, 0.3);
+            transition: all 0.2s ease;
         }
         
         .zen-editor-iframe-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(56, 189, 248, 0.7);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(147, 51, 234, 0.7));
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15), 
+                        0 0 8px rgba(56, 189, 248, 0.5);
+            border-color: rgba(56, 189, 248, 0.5);
+        }
+        
+        .zen-editor-iframe-container::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.9), rgba(147, 51, 234, 0.8));
+            box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.2), 
+                        0 0 12px rgba(56, 189, 248, 0.6);
+        }
+        
+        /* ZenEditor 组件本身的滚动条美化 - 使用类名选择器 */
+        .zen-editor-wrapper,
+        .zen-editor-wrapper .rack-module {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(56, 189, 248, 0.5) rgba(15, 23, 42, 0.3);
+        }
+        
+        .zen-editor-wrapper::-webkit-scrollbar,
+        .zen-editor-wrapper .rack-module::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        .zen-editor-wrapper::-webkit-scrollbar-track,
+        .zen-editor-wrapper .rack-module::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 6px;
+            margin: 2px;
+        }
+        
+        .zen-editor-wrapper::-webkit-scrollbar-thumb,
+        .zen-editor-wrapper .rack-module::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.6), rgba(147, 51, 234, 0.5));
+            border-radius: 6px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.1), 
+                        0 0 4px rgba(56, 189, 248, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .zen-editor-wrapper::-webkit-scrollbar-thumb:hover,
+        .zen-editor-wrapper .rack-module::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(147, 51, 234, 0.7));
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15), 
+                        0 0 8px rgba(56, 189, 248, 0.5);
+        }
+        
+        /* CodeMirror 内部滚动条美化 - 通过 iframe 内样式 */
+        iframe[title="Strudel REPL Editor"] {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(56, 189, 248, 0.6) rgba(15, 23, 42, 0.3);
+        }
+        
+        /* 针对 CodeMirror 的滚动条样式 - 需要在 iframe 加载后注入 */
+        .cm-scroller::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3) !important;
+            border-radius: 6px !important;
+            margin: 2px !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.6), rgba(147, 51, 234, 0.5)) !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.1), 
+                        0 0 4px rgba(56, 189, 248, 0.3) !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(147, 51, 234, 0.7)) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15), 
+                        0 0 8px rgba(56, 189, 248, 0.5) !important;
+            border-color: rgba(56, 189, 248, 0.5) !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.9), rgba(147, 51, 234, 0.8)) !important;
+            box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.2), 
+                        0 0 12px rgba(56, 189, 248, 0.6) !important;
+        }
+        
+        /* Firefox 滚动条样式 */
+        .cm-scroller {
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(56, 189, 248, 0.6) rgba(15, 23, 42, 0.3) !important;
         }
 
         /* Strudel Editor Styling */

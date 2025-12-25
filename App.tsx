@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [globalAiPrompt, setGlobalAiPrompt] = useState('');
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
   const [isChordAiLoading, setIsChordAiLoading] = useState(false);
-  const [autoPlayOnAi, setAutoPlayOnAi] = useState(false);
+  const [autoPlayOnAi, setAutoPlayOnAi] = useState(true);
 
   // Module States
   const [drumSeq, setDrumSeq] = useState<boolean[][]>(Array(4).fill(0).map(() => Array(16).fill(false)));
@@ -390,6 +390,7 @@ const App: React.FC = () => {
         masterReverb={masterReverb}
         isPlaying={isPlaying}
         genParams={genParams}
+        isZenEditorVisible={isZenEditorVisible}
         updateVol={(i, v) => { const n = [...mixerVolumes]; n[i] = v; setMixerVolumes(n); }}
         updatePan={(i, v) => { const n = [...mixerPanning]; n[i] = v; setMixerPanning(n); }}
         toggleMute={(i) => { const n = [...mixerMute]; n[i] = !n[i]; setMixerMute(n); }}

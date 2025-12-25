@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ModuleTitle from '../ModuleTitle';
 import { generateStrudelCode } from '../../services/geminiService';
 
@@ -14,6 +15,7 @@ const ZenEditor: React.FC<ZenEditorProps> = ({ bpm, isPlaying }) => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAiInput, setShowAiInput] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const generateDefaultCode = useCallback((currentBpm: number) => {
@@ -423,6 +425,119 @@ stack(
     }
   }, [bpm, tryDirectEditorUpdate]);
 
+  // 注入 iframe 滚动条样式
+  const injectScrollbarStyles = useCallback(() => {
+    if (!iframeRef.current) return;
+
+    try {
+      const iframe = iframeRef.current;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+
+      if (!iframeDoc) return;
+
+      // 检查是否已经注入过样式
+      if (iframeDoc.getElementById('custom-scrollbar-styles')) return;
+
+      const style = iframeDoc.createElement('style');
+      style.id = 'custom-scrollbar-styles';
+      style.textContent = `
+        /* CodeMirror 滚动条美化 */
+        .cm-scroller::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3) !important;
+            border-radius: 6px !important;
+            margin: 2px !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.6), rgba(147, 51, 234, 0.5)) !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.1), 
+                        0 0 4px rgba(56, 189, 248, 0.3) !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(147, 51, 234, 0.7)) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15), 
+                        0 0 8px rgba(56, 189, 248, 0.5) !important;
+            border-color: rgba(56, 189, 248, 0.5) !important;
+        }
+        
+        .cm-scroller::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.9), rgba(147, 51, 234, 0.8)) !important;
+            box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.2), 
+                        0 0 12px rgba(56, 189, 248, 0.6) !important;
+        }
+        
+        /* Firefox 滚动条 */
+        .cm-scroller {
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(56, 189, 248, 0.6) rgba(15, 23, 42, 0.3) !important;
+        }
+        
+        /* 通用滚动条美化 */
+        *::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+        }
+        
+        *::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3) !important;
+            border-radius: 6px !important;
+        }
+        
+        *::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.6), rgba(147, 51, 234, 0.5)) !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.1), 
+                        0 0 4px rgba(56, 189, 248, 0.3) !important;
+        }
+        
+        *::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(147, 51, 234, 0.7)) !important;
+            box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15), 
+                        0 0 8px rgba(56, 189, 248, 0.5) !important;
+        }
+      `;
+
+      iframeDoc.head.appendChild(style);
+    } catch (error) {
+      // 跨域限制时忽略错误
+      console.debug('Could not inject scrollbar styles into iframe:', error);
+    }
+  }, []);
+
+  // 监听 iframe 加载
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleLoad = () => {
+      // 延迟注入，确保 iframe 内容已加载
+      setTimeout(() => {
+        injectScrollbarStyles();
+      }, 500);
+    };
+
+    iframe.addEventListener('load', handleLoad);
+    
+    // 如果 iframe 已经加载，立即尝试注入
+    if (iframe.contentDocument?.readyState === 'complete') {
+      handleLoad();
+    }
+
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+    };
+  }, [injectScrollbarStyles]);
+
   // 监听来自 iframe 的消息
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -434,6 +549,10 @@ stack(
       switch (type) {
         case 'strudel-ready':
           setIsReady(true);
+          // iframe 准备就绪后注入样式
+          setTimeout(() => {
+            injectScrollbarStyles();
+          }, 300);
           break;
 
         case 'strudel-playing':
@@ -451,15 +570,38 @@ stack(
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
+  }, [injectScrollbarStyles]);
+
+  // 监听 ESC 键退出全屏
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    if (isFullscreen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isFullscreen]);
 
 
-  return (
-    <div className="col-span-2 rack-module p-0 flex flex-col relative animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
+  const editorContent = (
+    <div className="zen-editor-wrapper col-span-2 rack-module p-0 flex flex-col relative animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
       <div className="flex flex-col border-b border-slate-700/30 bg-slate-900/40">
         <div className="flex justify-between items-center px-4 py-2">
           <ModuleTitle icon="fas fa-code" title="Strudel Live Engine" index={0} />
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="px-2 py-1 rounded text-[8px] font-bold transition-all border bg-black/40 text-slate-400 border-slate-800 hover:bg-sky-500/20 hover:border-sky-500/30"
+              title="全屏模式"
+            >
+              <i className="fas fa-expand mr-1"></i>
+            </button>
             <button
               onClick={() => setShowAiInput(!showAiInput)}
               className={`px-2 py-1 rounded text-[8px] font-bold transition-all border ${
@@ -558,6 +700,127 @@ stack(
         </div>
       </div>
     </div>
+  );
+
+  // 全屏模式使用 Portal 渲染到 body
+  const fullscreenContent = (
+    <div className="zen-editor-wrapper fixed inset-0 z-[100] bg-slate-950 flex flex-col overflow-hidden">
+      <div className="flex flex-col border-b border-slate-700/30 bg-slate-900/40">
+        <div className="flex justify-between items-center px-4 py-2">
+          <ModuleTitle icon="fas fa-code" title="Strudel Live Engine" index={0} />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="px-2 py-1 rounded text-[8px] font-bold transition-all border bg-sky-500/30 text-sky-300 border-sky-500/50 hover:bg-sky-500/40"
+              title="退出全屏 (ESC)"
+            >
+              <i className="fas fa-compress mr-1"></i>
+            </button>
+            <button
+              onClick={() => setShowAiInput(!showAiInput)}
+              className={`px-2 py-1 rounded text-[8px] font-bold transition-all border ${
+                showAiInput 
+                  ? 'bg-purple-500/30 text-purple-300 border-purple-500/50' 
+                  : 'bg-black/40 text-purple-400 border-slate-800 hover:bg-purple-500/20 hover:border-purple-500/30'
+              }`}
+              title="AI Code Generator"
+            >
+              <i className="fas fa-sparkles mr-1"></i>AI
+            </button>
+            <div className="flex items-center gap-2 px-2 py-0.5 rounded bg-black/40 border border-slate-800">
+               <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Global Sync</span>
+               <span className="text-[9px] font-mono text-sky-400 font-bold">{bpm} BPM</span>
+               <button 
+                  onClick={handleSyncBpm}
+                  className="ml-2 w-4 h-4 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 hover:bg-sky-500 hover:text-white transition-all border border-sky-500/30"
+                  title="Sync BPM to Code (setcps)"
+                >
+                 <i className="fas fa-sync-alt text-[7px]"></i>
+               </button>
+            </div>
+            <div className="flex gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${isPlaying ? 'bg-emerald-500 led-emerald animate-pulse' : 'bg-slate-700'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${isReady ? 'bg-sky-500 led shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'bg-slate-700'}`}></div>
+            </div>
+          </div>
+        </div>
+        {showAiInput && (
+          <div className="px-4 pb-2 border-t border-slate-700/30 bg-slate-900/60">
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="输入你的需求，例如：添加一个复杂的鼓节奏..."
+                className="flex-1 px-2 py-1.5 text-[10px] bg-black/60 border border-slate-700 rounded text-slate-300 placeholder-slate-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
+                disabled={isGenerating}
+              />
+              <button
+                onClick={handleAiGenerate}
+                disabled={isGenerating || !aiPrompt.trim()}
+                className={`px-3 py-1.5 rounded text-[9px] font-bold transition-all border flex items-center gap-1.5 ${
+                  isGenerating || !aiPrompt.trim()
+                    ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
+                    : 'bg-purple-500/30 text-purple-300 border-purple-500/50 hover:bg-purple-500/40 hover:border-purple-500/70'
+                }`}
+              >
+                {isGenerating ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    <span>生成中...</span>
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-magic"></i>
+                    <span>生成</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 bg-black relative overflow-hidden zen-editor-iframe-container" style={{ minHeight: 0 }}>
+        <iframe
+          ref={iframeRef}
+          src="/strudel/index.html"
+          className="w-full h-full border-0"
+          style={{ 
+            display: 'block',
+            backgroundColor: '#000'
+          }}
+          title="Strudel REPL Editor"
+        />
+        
+        {/* Decorative Grid Overlays */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 border border-white/5 pointer-events-none" />
+      </div>
+      
+      <div className="px-4 py-1.5 bg-slate-900/60 border-t border-slate-800 flex justify-between items-center">
+        <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em]">External Sequence Node</span>
+        <div className="flex gap-4 items-center">
+          <span className="text-[7px] font-bold text-slate-600 uppercase flex items-center gap-1">
+            <i className="fas fa-microchip text-[6px] opacity-40"></i>
+            DSP: {isReady ? 'ACTIVE' : 'LOADING'}
+          </span>
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-sky-500/20 border border-sky-500/40 shadow-[0_0_8px_rgba(56,189,248,0.3)]">
+            <i className="fas fa-clock text-[8px] text-sky-400"></i>
+            <span className="text-[11px] font-mono font-bold text-sky-300 tracking-wider">
+              CPS: {(bpm/240).toFixed(3)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {editorContent}
+      {isFullscreen && typeof document !== 'undefined' && createPortal(fullscreenContent, document.body)}
+    </>
   );
 };
 
