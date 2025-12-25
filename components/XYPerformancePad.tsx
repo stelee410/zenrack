@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GeneratorParams } from '../types';
 
 const XYPerformancePad: React.FC<{
@@ -12,14 +12,53 @@ const XYPerformancePad: React.FC<{
   if (!isOpen) return null;
 
   const padRef = useRef<HTMLDivElement>(null);
+  const [isCtrlPressed, setIsCtrlPressed] = useState(false);
+  const initialParamsRef = useRef<{ frequency: number; volume: number; harmonicsIntensity: number } | null>(null);
+
+  // 保存打开 pad 时的初始参数
+  useEffect(() => {
+    if (isOpen && initialParamsRef.current === null) {
+      initialParamsRef.current = {
+        frequency: params.frequency,
+        volume: params.volume,
+        harmonicsIntensity: params.harmonicsIntensity
+      };
+    }
+    // 当 pad 关闭时，重置初始参数引用
+    if (!isOpen) {
+      initialParamsRef.current = null;
+    }
+  }, [isOpen, params.frequency, params.volume, params.harmonicsIntensity]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if (e.key === 'Control') {
+        setIsCtrlPressed(true);
+      }
     };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control') {
+        setIsCtrlPressed(false);
+        // 恢复初始位置
+        if (initialParamsRef.current) {
+          onUpdate({
+            frequency: initialParamsRef.current.frequency,
+            volume: initialParamsRef.current.volume,
+            harmonicsIntensity: initialParamsRef.current.harmonicsIntensity
+          });
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [onClose, onUpdate]);
 
   const handleInteraction = (clientX: number, clientY: number) => {
     if (!padRef.current) return;
@@ -44,7 +83,10 @@ const XYPerformancePad: React.FC<{
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
-    if (e.buttons === 1) handleInteraction(e.clientX, e.clientY);
+    // 如果按住 Ctrl，直接跟随鼠标；否则需要按住左键
+    if (isCtrlPressed || e.buttons === 1) {
+      handleInteraction(e.clientX, e.clientY);
+    }
   };
 
   const onMouseDown = (e: React.MouseEvent) => handleInteraction(e.clientX, e.clientY);

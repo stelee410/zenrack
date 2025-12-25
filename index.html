@@ -48,11 +48,14 @@
 
         /* Strudel Editor Styling */
         strudel-editor {
-            display: block;
-            height: 100%;
-            width: 100%;
+            display: block !important;
+            height: 100% !important;
+            width: 100% !important;
             --cm-font-family: 'JetBrains Mono', 'Fira Code', monospace;
             --cm-background: transparent;
+            overflow: hidden !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
 
         /* 深度覆盖 Strudel 内部 CodeMirror 样式 - 调大字号 */
@@ -64,14 +67,52 @@
         .cm-editor {
             font-size: 13px !important;
             background: #000 !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         .cm-scroller {
             line-height: 1.5 !important;
+            overflow: auto !important;
+            flex: 1 !important;
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        .cm-content {
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+            padding-left: 8px !important;
         }
         .cm-gutters {
             background-color: #0f172a !important;
             border-right: 1px solid #1e293b !important;
             font-size: 11px !important;
+        }
+        
+        /* 去除顶部空白 - 使用更具体的选择器 */
+        strudel-editor .cm-editor {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        strudel-editor .cm-scroller {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        /* 覆盖可能的顶部 padding/margin */
+        strudel-editor > * {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        /* 确保编辑器容器没有额外的空白 */
+        strudel-editor > div {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+            height: 100% !important;
         }
 
         .adsr-fader {
