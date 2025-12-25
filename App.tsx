@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [globalAiPrompt, setGlobalAiPrompt] = useState('');
   const [isGlobalLoading, setIsGlobalLoading] = useState(false);
   const [isChordAiLoading, setIsChordAiLoading] = useState(false);
-  const [autoPlayOnAi, setAutoPlayOnAi] = useState(true);
+  const [autoPlayOnAi, setAutoPlayOnAi] = useState(false);
 
   // Module States
   const [drumSeq, setDrumSeq] = useState<boolean[][]>(Array(4).fill(0).map(() => Array(16).fill(false)));

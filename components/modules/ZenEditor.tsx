@@ -32,82 +32,220 @@ stack(
     }
   }, []);
 
-  // 同步BPM到代码中的setcps
-  const handleSyncBpm = useCallback(() => {
-    if (!iframeRef.current) return;
+  // 尝试直接操作 iframe 内的编辑器（通过 #code 容器）
+  const tryDirectEditorUpdate = useCallback((setcpsLine: string): boolean => {
+    if (!iframeRef.current) return false;
 
     try {
-      let currentHash = '';
-      
-      // 尝试从iframe的location获取hash
-      try {
-        const iframeWindow = iframeRef.current.contentWindow;
-        if (iframeWindow && iframeWindow.location) {
-          currentHash = iframeWindow.location.hash || '';
+      const iframe = iframeRef.current;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+
+      if (!iframeDoc) {
+        return false;
+      }
+
+      // 通过 #code 容器查找编辑器
+      const codeContainer = iframeDoc.querySelector('#code') as HTMLElement;
+      if (!codeContainer) {
+        return false;
+      }
+
+      // 尝试通过 .cm-editor 访问 CodeMirror view
+      const cmEditor = codeContainer.querySelector('.cm-editor') as HTMLElement;
+      if (cmEditor) {
+        // 尝试多种方式访问 CodeMirror view
+        const cmView = (cmEditor as any).cmView || 
+                     (cmEditor as any).__cm_view ||
+                     (cmEditor as any).view ||
+                     (cmEditor as any).cm?.view ||
+                     (cmEditor.parentElement as any)?.cmView ||
+                     (codeContainer as any).cmView;
+        
+        if (cmView && cmView.state && cmView.dispatch) {
+          const doc = cmView.state.doc;
+          const currentCode = doc.toString();
+          
+          // 从 setcpsLine 中提取新值（格式：setcps(0.1234)）
+          const newValueMatch = setcpsLine.match(/setcps\s*\(\s*([^)]+)\s*\)/);
+          if (!newValueMatch) return false;
+          const newValue = newValueMatch[1];
+          
+          // 查找 setcps 的位置，只替换括号内的值
+          const setcpsRegex = /setcps\s*\(\s*([^)]+)\s*\)/gi;
+          const match = setcpsRegex.exec(currentCode);
+          
+          if (match) {
+            // 找到 setcps，只替换括号内的值
+            const fullMatch = match[0]; // 完整的 setcps(...)
+            const oldValue = match[1]; // 括号内的旧值
+            const matchStart = match.index;
+            
+            // 计算括号内值的精确位置
+            const valueStart = matchStart + fullMatch.indexOf('(') + 1;
+            const valueEnd = valueStart + oldValue.length;
+            
+            // 只替换括号内的值，保持括号和格式不变
+            cmView.dispatch({
+              changes: {
+                from: valueStart,
+                to: valueEnd,
+                insert: newValue
+              }
+            });
+            return true;
+          } else {
+            // 如果没有找到 setcps，在开头插入
+            cmView.dispatch({
+              changes: {
+                from: 0,
+                to: 0,
+                insert: `${setcpsLine}\n\n`
+              }
+            });
+            return true;
+          }
         }
-      } catch (e) {
-        // 如果无法访问iframe location（跨域限制），从src属性中提取
-        const src = iframeRef.current.src;
-        const hashIndex = src.indexOf('#');
-        if (hashIndex !== -1) {
-          currentHash = src.substring(hashIndex);
+        
+        // 如果找不到 view，尝试直接操作 contenteditable 元素
+        const cmContent = codeContainer.querySelector('.cm-content') as HTMLElement;
+        if (cmContent && cmContent.contentEditable === 'true') {
+          const currentCode = cmContent.innerText || cmContent.textContent || '';
+          
+          // 从 setcpsLine 中提取新值
+          const newValueMatch = setcpsLine.match(/setcps\s*\(\s*([^)]+)\s*\)/);
+          if (!newValueMatch) return false;
+          const newValue = newValueMatch[1];
+          
+          // 查找 setcps 的位置，只替换括号内的值
+          const setcpsRegex = /setcps\s*\(\s*([^)]+)\s*\)/gi;
+          const match = setcpsRegex.exec(currentCode);
+          
+          if (match) {
+            // 找到 setcps，只替换括号内的值
+            const fullMatch = match[0];
+            const oldValue = match[1];
+            const matchStart = match.index;
+            
+            // 计算括号内值的精确位置
+            const valueStart = matchStart + fullMatch.indexOf('(') + 1;
+            const valueEnd = valueStart + oldValue.length;
+            
+            // 只替换括号内的值，保持其他内容不变
+            const beforeValue = currentCode.substring(0, valueStart);
+            const afterValue = currentCode.substring(valueEnd);
+            const updatedCode = beforeValue + newValue + afterValue;
+            cmContent.textContent = updatedCode;
+            cmContent.innerText = updatedCode;
+            
+            // 触发输入事件，让 CodeMirror 知道内容变化
+            ['input', 'change', 'keyup', 'paste'].forEach(eventType => {
+              cmContent.dispatchEvent(new Event(eventType, { bubbles: true }));
+            });
+            
+            return true;
+          } else {
+            // 如果没有找到 setcps，在开头插入
+            const updatedCode = `${setcpsLine}\n\n${currentCode}`;
+            cmContent.textContent = updatedCode;
+            cmContent.innerText = updatedCode;
+            
+            ['input', 'change', 'keyup', 'paste'].forEach(eventType => {
+              cmContent.dispatchEvent(new Event(eventType, { bubbles: true }));
+            });
+            
+            return true;
+          }
         }
       }
+
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }, []);
+
+  // 同步BPM到代码中的setcps
+  const handleSyncBpm = useCallback(() => {
+    if (!iframeRef.current) {
+      console.warn('Strudel iframe not ready');
+      return;
+    }
+
+    try {
+      const cps = (bpm / 240).toFixed(4);
+      const setcpsLine = `setcps(${cps})`;
+      // 首先尝试直接操作编辑器
+      if (tryDirectEditorUpdate(setcpsLine)) {
+        return;
+      }
+
+      // 如果直接操作失败，回退到 URL 方法
       
-      // 解码base64代码
+      const src = iframeRef.current.src;
+      const hashIndex = src.indexOf('#');
       let code = '';
-      if (currentHash && currentHash.length > 1) {
-        // 去掉#号，然后URL解码再base64解码
-        const encoded = currentHash.substring(1); // 去掉#
+      
+      if (hashIndex !== -1) {
+        const hash = src.substring(hashIndex + 1);
         try {
-          const urlDecoded = decodeURIComponent(encoded);
+          const urlDecoded = decodeURIComponent(hash);
           code = atob(urlDecoded);
         } catch (e) {
-          // 如果URL解码失败，直接尝试base64解码
           try {
-            code = atob(encoded);
+            code = atob(hash);
           } catch (e2) {
-            console.error('Failed to decode code from URL:', e2);
-            // 如果解码失败，使用空代码
+            console.warn('Failed to decode code, using empty code');
             code = '';
           }
         }
       }
 
-      // 计算新的CPS值
-      const cps = (bpm / 240).toFixed(4);
-      const setcpsRegex = /setcps\s*\(\s*[^)]+\s*\)/gi;
-      
-      // 处理代码
+      // 更新或插入 setcps（只替换括号内的值）
+      const setcpsRegex = /setcps\s*\(\s*([^)]+)\s*\)/gi;
       let updatedCode: string;
+      
       if (code.trim()) {
-        if (setcpsRegex.test(code)) {
-          // 如果存在setcps，替换它
-          updatedCode = code.replace(setcpsRegex, `setcps(${cps})`);
+        const match = setcpsRegex.exec(code);
+        if (match) {
+          // 找到 setcps，只替换括号内的值
+          const fullMatch = match[0];
+          const oldValue = match[1];
+          const matchStart = match.index;
+          
+          // 计算括号内值的精确位置
+          const valueStart = matchStart + fullMatch.indexOf('(') + 1;
+          const valueEnd = valueStart + oldValue.length;
+          
+          // 只替换括号内的值，保持其他内容不变
+          updatedCode = code.substring(0, valueStart) + cps + code.substring(valueEnd);
         } else {
-          // 如果不存在，在代码开头添加setcps
-          updatedCode = `setcps(${cps})\n\n${code.trim()}`;
+          // 如果没有找到 setcps，在开头插入
+          updatedCode = `${setcpsLine}\n\n${code.trim()}`;
         }
       } else {
-        // 如果代码为空，创建一个包含setcps的默认代码
-        updatedCode = `setcps(${cps})`;
+        updatedCode = setcpsLine;
       }
 
-      // base64编码并URL编码
+      // 编码并更新 URL
       const base64Encoded = btoa(updatedCode);
       const urlEncoded = encodeURIComponent(base64Encoded);
-      
-      // 更新iframe的src
-      const currentSrc = iframeRef.current.src;
-      const baseUrl = currentSrc.split('#')[0]; // 获取基础URL（去掉hash）
+      const baseUrl = src.split('#')[0];
       const newSrc = `${baseUrl}#${urlEncoded}`;
       
-      // 更新iframe的src
-      iframeRef.current.src = newSrc;
+      // 更新 iframe src（这会触发 Strudel 重新加载代码）
+      if (iframeRef.current) {
+        iframeRef.current.src = '';
+        setTimeout(() => {
+          if (iframeRef.current) {
+            iframeRef.current.src = newSrc;
+          }
+        }, 0);
+      }
+      
     } catch (error) {
       console.error('Error syncing BPM:', error);
     }
-  }, [bpm]);
+  }, [bpm, tryDirectEditorUpdate]);
 
   // 监听来自 iframe 的消息
   useEffect(() => {
@@ -115,7 +253,7 @@ stack(
       // 安全检查：可以添加 origin 检查
       // if (event.origin !== window.location.origin) return;
 
-      const { type, playing } = event.data;
+      const { type, playing, code } = event.data;
 
       switch (type) {
         case 'strudel-ready':
@@ -125,6 +263,11 @@ stack(
         case 'strudel-playing':
           setIsStrudelPlaying(playing === true);
           break;
+
+        // 处理代码响应（如果 Strudel 支持）
+        case 'code-response':
+          // 这个会在 handleSyncBpm 中处理
+          break;
       }
     };
 
@@ -133,6 +276,7 @@ stack(
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+
 
   return (
     <div className="col-span-2 rack-module p-0 flex flex-col relative animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
