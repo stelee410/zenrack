@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recFormat, setRecFormat] = useState<RecordingFormat>('wav');
   const [isEncoding, setIsEncoding] = useState(false);
-  const [viewMode, setViewMode] = useState<'rack' | 'editor'>('rack');
+  const [isZenEditorVisible, setIsZenEditorVisible] = useState(false);
   const [zenText, setZenText] = useState('');
   
   const [currentStep, setCurrentStep] = useState(0);
@@ -296,8 +296,8 @@ const App: React.FC = () => {
   };
 
 
-  const toggleViewMode = () => {
-    setViewMode(v => v === 'rack' ? 'editor' : 'rack');
+  const toggleZenEditorVisibility = () => {
+    setIsZenEditorVisible(v => !v);
   };
 
   if (!isStarted) return (
@@ -310,7 +310,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-[#020617] p-2 gap-2 overflow-hidden text-slate-400">
       <Header 
-        toggleViewMode={toggleViewMode} isPlaying={isPlaying} setIsPlaying={setIsPlaying}
+        toggleViewMode={toggleZenEditorVisibility} isPlaying={isPlaying} setIsPlaying={setIsPlaying}
         handleToggleRecord={handleToggleRecord} isRecording={isRecording} isEncoding={isEncoding}
         recFormat={recFormat} setRecFormat={setRecFormat} handlePanic={handlePanic}
         importPatch={importPatch} exportPatch={exportPatch} bpm={bpm} setBpm={setBpm}
@@ -319,33 +319,44 @@ const App: React.FC = () => {
         setAutoPlayOnAi={setAutoPlayOnAi} isGlobalLoading={isGlobalLoading}
       />
 
-      <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0 overflow-hidden transition-all duration-500">
-        {viewMode === 'rack' ? (
-          <>
-            <RhythmCore 
-              drumSeq={drumSeq} setDrumSeq={setDrumSeq} 
-              selectedDrumIdx={selectedDrumIdx} setSelectedDrumIdx={setSelectedDrumIdx}
-              drumSettings={drumSettings} setDrumSettings={setDrumSettings}
-              drumEffects={drumEffects} setDrumEffects={setDrumEffects}
-              currentStep={currentStep}
-            />
+      <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0 overflow-hidden transition-all duration-500 relative">
+        {/* RhythmCore and AstralPads - always visible */}
+        <RhythmCore 
+          drumSeq={drumSeq} setDrumSeq={setDrumSeq} 
+          selectedDrumIdx={selectedDrumIdx} setSelectedDrumIdx={setSelectedDrumIdx}
+          drumSettings={drumSettings} setDrumSettings={setDrumSettings}
+          drumEffects={drumEffects} setDrumEffects={setDrumEffects}
+          currentStep={currentStep}
+        />
 
-            <AstralPads 
-              padPreset={padPreset} setPadPreset={setPadPreset}
-              chords={chords} setChords={setChords}
-              chordIsPlaying={chordIsPlaying} setChordIsPlaying={setChordIsPlaying}
-              chordDuration={chordDuration} setChordDuration={setChordDuration}
-              arpSpeed={arpSpeed} setArpSpeed={setArpSpeed}
-              chordRange={chordRange} setChordRange={setChordRange}
-              chordIsTriplet={chordIsTriplet} setChordIsTriplet={setChordIsTriplet}
-              padParams={padParams} setPadParams={setPadParams}
-              isPlaying={isPlaying} totalSteps={totalSteps}
-              handleMagicChords={handleMagicChords} isChordAiLoading={isChordAiLoading}
-            />
-          </>
-        ) : (
+        <AstralPads 
+          padPreset={padPreset} setPadPreset={setPadPreset}
+          chords={chords} setChords={setChords}
+          chordIsPlaying={chordIsPlaying} setChordIsPlaying={setChordIsPlaying}
+          chordDuration={chordDuration} setChordDuration={setChordDuration}
+          arpSpeed={arpSpeed} setArpSpeed={setArpSpeed}
+          chordRange={chordRange} setChordRange={setChordRange}
+          chordIsTriplet={chordIsTriplet} setChordIsTriplet={setChordIsTriplet}
+          padParams={padParams} setPadParams={setPadParams}
+          isPlaying={isPlaying} totalSteps={totalSteps}
+          handleMagicChords={handleMagicChords} isChordAiLoading={isChordAiLoading}
+        />
+
+        {/* ZenEditor - always rendered but visibility controlled, overlays first two grid cells */}
+        <div 
+          className={`absolute z-50 transition-opacity duration-500 ${
+            isZenEditorVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{ 
+            top: 0,
+            left: 0,
+            width: 'calc((100% - 1rem) * 2 / 3 + 0.5rem)',
+            height: '100%',
+            visibility: isZenEditorVisible ? 'visible' : 'hidden'
+          }}
+        >
           <ZenEditor zenText={zenText} bpm={bpm} isPlaying={isPlaying} />
-        )}
+        </div>
 
         <BiomesModule 
           envType={envType} setEnvType={setEnvType}
@@ -379,7 +390,6 @@ const App: React.FC = () => {
         masterReverb={masterReverb}
         isPlaying={isPlaying}
         genParams={genParams}
-        viewMode={viewMode}
         updateVol={(i, v) => { const n = [...mixerVolumes]; n[i] = v; setMixerVolumes(n); }}
         updatePan={(i, v) => { const n = [...mixerPanning]; n[i] = v; setMixerPanning(n); }}
         toggleMute={(i) => { const n = [...mixerMute]; n[i] = !n[i]; setMixerMute(n); }}

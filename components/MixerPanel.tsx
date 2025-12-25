@@ -14,7 +14,6 @@ interface MixerPanelProps {
   masterReverb: number;
   isPlaying: boolean;
   genParams: GeneratorParams[];
-  viewMode: 'rack' | 'editor';
   updateVol: (i: number, v: number) => void;
   updatePan: (i: number, v: number) => void;
   toggleMute: (i: number) => void;
@@ -23,16 +22,13 @@ interface MixerPanelProps {
   setMasterReverb: (v: number) => void;
 }
 
-const MixerPanel: React.FC<MixerPanelProps> = React.memo(({ mixerVolumes, mixerPanning, mixerMute, mixerSolo, masterVolume, masterReverb, isPlaying, genParams, viewMode, updateVol, updatePan, toggleMute, toggleSolo, setMasterVolume, setMasterReverb }) => {
+const MixerPanel: React.FC<MixerPanelProps> = React.memo(({ mixerVolumes, mixerPanning, mixerMute, mixerSolo, masterVolume, masterReverb, isPlaying, genParams, updateVol, updatePan, toggleMute, toggleSolo, setMasterVolume, setMasterReverb }) => {
   const channelLabels = ['RHYTHM', 'PADS', 'BIOMES', 'DRONE-1', 'BINAUR-2', 'VISION'];
 
   return (
     <footer className="h-32 shrink-0 rack-module border-none !bg-slate-950/70 p-1 flex gap-1.5 shadow-[0_-8px_20px_rgba(0,0,0,0.4)]">
       <div className="flex-1 flex gap-1 items-stretch transition-all duration-500">
         {channelLabels.map((label, i) => {
-          // Hide PADS channel (index 1) in editor mode
-          if (viewMode === 'editor' && i === 1) return null;
-          
           const isActive = isPlaying && (i < 3 ? true : (i < 5 ? genParams[i-3].active : true));
           const isMuted = mixerMute[i];
           const isSoloed = mixerSolo[i];

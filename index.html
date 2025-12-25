@@ -45,6 +45,32 @@
             background: #334155;
             border-radius: 2px;
         }
+        
+        /* ZenEditor iframe scrollbar styling */
+        .zen-editor-iframe-container {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(56, 189, 248, 0.5) rgba(15, 23, 42, 0.8);
+        }
+        
+        .zen-editor-iframe-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .zen-editor-iframe-container::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 4px;
+        }
+        
+        .zen-editor-iframe-container::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.5);
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        
+        .zen-editor-iframe-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.7);
+        }
 
         /* Strudel Editor Styling */
         strudel-editor {
