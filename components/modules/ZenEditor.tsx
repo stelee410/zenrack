@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import ModuleTitle from '../ModuleTitle';
 import { generateStrudelCode } from '../../services/geminiService';
@@ -11,7 +11,11 @@ interface ZenEditorProps {
   initialCode?: string;
 }
 
-const ZenEditor: React.FC<ZenEditorProps> = ({ bpm, isPlaying, onCodeChange, initialCode }) => {
+export interface ZenEditorRef {
+  getCurrentCode: () => string;
+}
+
+const ZenEditor = forwardRef<ZenEditorRef, ZenEditorProps>(({ bpm, isPlaying, onCodeChange, initialCode }, ref) => {
   const [isStrudelPlaying, setIsStrudelPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -227,6 +231,13 @@ stack(
       return '';
     }
   }, []);
+
+  // 暴露方法给父组件
+  useImperativeHandle(ref, () => ({
+    getCurrentCode: () => {
+      return getCurrentCode();
+    }
+  }), [getCurrentCode]);
 
   // 通过 URL 更新代码（回退方法）
   const updateCodeViaUrl = useCallback((code: string): boolean => {
@@ -576,13 +587,13 @@ stack(
           // iframe 准备就绪后注入样式
           setTimeout(() => {
             injectScrollbarStyles();
+            // 如果提供了初始代码，在iframe准备好后设置
+            if (initialCode && initialCode.trim()) {
+              setTimeout(() => {
+                updateFullCode(initialCode, false);
+              }, 200);
+            }
           }, 300);
-          // 如果提供了初始代码，在iframe准备好后设置
-          if (initialCode && initialCode.trim()) {
-            setTimeout(() => {
-              updateFullCode(initialCode, false);
-            }, 500);
-          }
           break;
 
         case 'strudel-playing':
@@ -622,11 +633,15 @@ stack(
   // 当initialCode变化时更新代码
   useEffect(() => {
     if (initialCode && initialCode.trim() && isReady) {
-      const currentCode = getCurrentCode();
-      // 只有当代码不同时才更新
-      if (currentCode !== initialCode) {
-        updateFullCode(initialCode, false);
-      }
+      // 延迟一下确保iframe完全准备好
+      const timer = setTimeout(() => {
+        const currentCode = getCurrentCode();
+        // 只有当代码不同时才更新
+        if (currentCode.trim() !== initialCode.trim()) {
+          updateFullCode(initialCode, false);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [initialCode, isReady, getCurrentCode, updateFullCode]);
 
@@ -880,6 +895,8 @@ stack(
       {isFullscreen && typeof document !== 'undefined' && createPortal(fullscreenContent, document.body)}
     </>
   );
-};
+});
+
+ZenEditor.displayName = 'ZenEditor';
 
 export default ZenEditor;

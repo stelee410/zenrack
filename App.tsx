@@ -97,7 +97,31 @@ const App: React.FC = () => {
   };
 
   const exportPatch = () => {
-    const state = { bpm, drumSeq, drumSettings, drumEffects, padPreset, chords, chordDuration, arpSpeed, chordRange, chordIsTriplet, padParams, envType, envParams, genParams, genEffects, mixerVolumes, mixerPanning, mixerMute, mixerSolo, masterReverb, masterVolume };
+    const state = { 
+      bpm, 
+      drumSeq, 
+      drumSettings, 
+      drumEffects, 
+      padPreset, 
+      chords, 
+      chordDuration, 
+      arpSpeed, 
+      chordRange, 
+      chordIsTriplet, 
+      padParams, 
+      envType, 
+      envParams, 
+      envUrlInput,
+      genParams, 
+      genEffects, 
+      genActiveTab,
+      mixerVolumes, 
+      mixerPanning, 
+      mixerMute, 
+      mixerSolo, 
+      masterReverb, 
+      masterVolume
+    };
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -111,17 +135,34 @@ const App: React.FC = () => {
     reader.onload = (ev) => {
       try {
         const p = JSON.parse(ev.target?.result as string);
-        setBpm(p.bpm); setDrumSeq(p.drumSeq); setDrumSettings(p.drumSettings); setDrumEffects(p.drumEffects);
-        setPadPreset(p.padPreset); setChords(p.chords); setChordDuration(p.chordDuration); setArpSpeed(p.arpSpeed);
-        setChordRange(p.chordRange || 2); setChordIsTriplet(p.chordIsTriplet || false);
+        setBpm(p.bpm); 
+        setDrumSeq(p.drumSeq); 
+        setDrumSettings(p.drumSettings); 
+        setDrumEffects(p.drumEffects);
+        setPadPreset(p.padPreset); 
+        setChords(p.chords); 
+        setChordDuration(p.chordDuration); 
+        setArpSpeed(p.arpSpeed);
+        setChordRange(p.chordRange || 2); 
+        setChordIsTriplet(p.chordIsTriplet || false);
         setPadParams(p.padParams || { reverb: 0.4, echo: 0.3, lpf: 20000, reso: 1 });
-        setEnvType(p.envType); setEnvParams(p.envParams);
+        setEnvType(p.envType || 'None'); 
+        setEnvParams(p.envParams || { level: 0.5, reverb: 0.3, echo: 0.2 });
+        setEnvUrlInput(p.envUrlInput || '');
         const gens = p.genParams.map((g: any) => ({ ...g, baseFrequency: g.baseFrequency || g.frequency }));
         setGenParams(gens); 
-        setGenEffects(p.genEffects); setMixerVolumes(p.mixerVolumes);
-        setMixerPanning(p.mixerPanning); setMixerMute(p.mixerMute); setMixerSolo(p.mixerSolo);
-        setMasterReverb(p.masterReverb); setMasterVolume(p.masterVolume);
-      } catch (err) { alert("Invalid patch file."); }
+        setGenEffects(p.genEffects || Array(3).fill(null).map(() => ({ reverb: 0.2, echo: 0.1 })));
+        setGenActiveTab(p.genActiveTab || ['OSC', 'OSC', 'OSC']);
+        setMixerVolumes(p.mixerVolumes || [1, 1, 1, 1, 1, 1]);
+        setMixerPanning(p.mixerPanning || [0, 0, 0, 0, 0, 0]);
+        setMixerMute(p.mixerMute || Array(6).fill(false));
+        setMixerSolo(p.mixerSolo || Array(6).fill(false));
+        setMasterReverb(p.masterReverb || 0.5); 
+        setMasterVolume(p.masterVolume || 0.8);
+      } catch (err) { 
+        console.error("Import error:", err);
+        alert("Invalid patch file."); 
+      }
     };
     reader.readAsText(file);
   };
@@ -357,7 +398,11 @@ const App: React.FC = () => {
             visibility: isZenEditorVisible ? 'visible' : 'hidden'
           }}
         >
-          <ZenEditor zenText={zenText} bpm={bpm} isPlaying={isPlaying} />
+          <ZenEditor 
+            zenText={zenText} 
+            bpm={bpm} 
+            isPlaying={isPlaying}
+          />
         </div>
 
         <BiomesModule 
