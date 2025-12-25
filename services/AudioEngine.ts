@@ -52,6 +52,9 @@ class AudioEngine {
   oscNodes: Map<number, { 
     fundamental: OscGroup,
     harmonics: OscGroup[],
+    multiSawGroups?: OscGroup[],
+    fifthGroup?: OscGroup | null,
+    octaveGroup?: OscGroup | null,
     lfoNode?: OscillatorNode,
     lfoGain?: GainNode,
     params: GeneratorParams
@@ -521,7 +524,24 @@ class AudioEngine {
     }
   }
 
-  private createOscGroup(id: number, freq: number, binauralOffset: number, vol: number, adsr: ADSRConfig, isInfinite: boolean): OscGroup {
+  private createPulseWave(pulseWidth: number): PeriodicWave {
+    const ctx = this.ctx!;
+    const real = new Float32Array(513);
+    const imag = new Float32Array(513);
+    // 生成脉冲波形的傅里叶级数
+    // 脉冲宽度在0-1之间，0.5是方波
+    const pw = Math.max(0.01, Math.min(0.99, pulseWidth));
+    for (let i = 1; i < 513; i++) {
+      const n = i;
+      const phase = Math.PI * n * pw;
+      const amplitude = (2 / (Math.PI * n)) * Math.sin(phase);
+      real[i] = amplitude;
+      imag[i] = 0;
+    }
+    return ctx.createPeriodicWave(real, imag);
+  }
+
+  private createOscGroup(id: number, freq: number, binauralOffset: number, vol: number, adsr: ADSRConfig, isInfinite: boolean, waveform?: WaveformType, pulseWidth?: number): OscGroup {
     const ctx = this.ctx!;
     const now = ctx.currentTime;
     const oscL = ctx.createOscillator();
@@ -531,6 +551,20 @@ class AudioEngine {
     const gainNode = ctx.createGain();
     oscL.frequency.setValueAtTime(freq, now);
     oscR.frequency.setValueAtTime(freq + binauralOffset, now);
+    
+    // 如果是指定波形，设置波形类型
+    if (waveform) {
+      if (waveform === 'square' && pulseWidth !== undefined && pulseWidth !== 0.5) {
+        // 使用自定义脉冲波形
+        const pulseWave = this.createPulseWave(pulseWidth);
+        oscL.setPeriodicWave(pulseWave);
+        oscR.setPeriodicWave(pulseWave);
+      } else {
+        oscL.type = waveform;
+        oscR.type = waveform;
+      }
+    }
+    
     panL.pan.value = -1; panR.pan.value = 1;
     oscL.connect(panL); oscR.connect(panR);
     panL.connect(gainNode); panR.connect(gainNode);
@@ -552,20 +586,72 @@ class AudioEngine {
     if (isInfinite && this.oscNodes.has(id)) return;
     this.stopOsc(id, 0.01);
     const now = this.ctx.currentTime;
-    const fundamental = this.createOscGroup(id, params.frequency, params.binauralBeat, params.volume, params.adsr, isInfinite);
-    fundamental.oscL.type = params.waveform;
-    fundamental.oscR.type = params.waveform;
+    
+    // 创建基础振荡器组
+    // 如果是multi-saw模式，基础振荡器音量设为0（不使用）
+    const baseVol = (params.waveform === 'sawtooth' && params.multiSaw) ? 0 : params.volume;
+    const fundamental = this.createOscGroup(id, params.frequency, params.binauralBeat, baseVol, params.adsr, isInfinite, params.waveform, params.waveform === 'square' ? params.pulseWidth : undefined);
+    
+    // Multi-saw: 如果是sawtooth且启用multi-saw，创建多个失谐的sawtooth振荡器
+    const multiSawGroups: OscGroup[] = [];
+    if (params.waveform === 'sawtooth' && params.multiSaw) {
+      const sawCount = 3;
+      const detuneAmount = 0.1; // 失谐量（半音）
+      for (let i = 0; i < sawCount; i++) {
+        const detune = (i - (sawCount - 1) / 2) * detuneAmount;
+        const detunedFreq = params.frequency * Math.pow(2, detune / 12);
+        const sawVol = params.volume / sawCount;
+        const sawGroup = this.createOscGroup(id, detunedFreq, params.binauralBeat, sawVol, params.adsr, isInfinite, 'sawtooth');
+        sawGroup.oscL.start();
+        sawGroup.oscR.start();
+        multiSawGroups.push(sawGroup);
+      }
+    }
+    
+    // 谐波
     const harmonics: OscGroup[] = [];
     if (params.harmonicsIntensity > 0) {
       for (let n = 2; n <= 4; n++) {
         const hVol = params.volume * params.harmonicsIntensity * (1 / (n * 1.5));
-        const hGroup = this.createOscGroup(id, params.frequency * n, params.binauralBeat * (n/2), hVol, params.adsr, isInfinite);
-        hGroup.oscL.type = 'sine';
-        hGroup.oscR.type = 'sine';
+        const hGroup = this.createOscGroup(id, params.frequency * n, params.binauralBeat * (n/2), hVol, params.adsr, isInfinite, 'sine');
         hGroup.oscL.start(); hGroup.oscR.start();
         harmonics.push(hGroup);
       }
     }
+    
+    // 五度音（频率是基频的1.5倍）
+    const fifthGroup: OscGroup | null = params.fifthIntensity > 0 ? this.createOscGroup(
+      id, 
+      params.frequency * 1.5, 
+      params.binauralBeat * 1.5, 
+      params.volume * params.fifthIntensity, 
+      params.adsr, 
+      isInfinite,
+      params.waveform,
+      params.waveform === 'square' ? params.pulseWidth : undefined
+    ) : null;
+    if (fifthGroup) {
+      fifthGroup.oscL.start();
+      fifthGroup.oscR.start();
+    }
+    
+    // 八度音（频率是基频的2倍）
+    const octaveGroup: OscGroup | null = params.octaveIntensity > 0 ? this.createOscGroup(
+      id, 
+      params.frequency * 2, 
+      params.binauralBeat * 2, 
+      params.volume * params.octaveIntensity, 
+      params.adsr, 
+      isInfinite,
+      params.waveform,
+      params.waveform === 'square' ? params.pulseWidth : undefined
+    ) : null;
+    if (octaveGroup) {
+      octaveGroup.oscL.start();
+      octaveGroup.oscR.start();
+    }
+    
+    // LFO
     let lfoNode: OscillatorNode | undefined;
     let lfoGain: GainNode | undefined;
     if (params.lfo.active) {
@@ -582,26 +668,87 @@ class AudioEngine {
         lfoGain!.connect(h.oscL.frequency);
         lfoGain!.connect(h.oscR.frequency);
       });
+      multiSawGroups.forEach(sg => {
+        lfoGain!.connect(sg.oscL.frequency);
+        lfoGain!.connect(sg.oscR.frequency);
+      });
+      if (fifthGroup) {
+        lfoGain.connect(fifthGroup.oscL.frequency);
+        lfoGain.connect(fifthGroup.oscR.frequency);
+      }
+      if (octaveGroup) {
+        lfoGain.connect(octaveGroup.oscL.frequency);
+        lfoGain.connect(octaveGroup.oscR.frequency);
+      }
       lfoNode.start();
     }
+    
     fundamental.oscL.start(); fundamental.oscR.start();
-    this.oscNodes.set(id, { fundamental, harmonics, lfoNode, lfoGain, params });
+    this.oscNodes.set(id, { 
+      fundamental, 
+      harmonics, 
+      lfoNode, 
+      lfoGain, 
+      params,
+      multiSawGroups,
+      fifthGroup,
+      octaveGroup
+    });
   }
 
   updateOscLive(id: number, params: GeneratorParams) {
     const nodes = this.oscNodes.get(id);
     if (!nodes || !this.ctx) return;
     const now = this.ctx.currentTime;
-    if (nodes.params.gateDuration !== params.gateDuration) {
-        this.triggerOsc(id, params, 80); 
-        return;
+    
+    // 如果关键参数改变，需要重新触发
+    if (nodes.params.gateDuration !== params.gateDuration || 
+        nodes.params.waveform !== params.waveform ||
+        nodes.params.multiSaw !== params.multiSaw ||
+        (params.waveform === 'square' && nodes.params.pulseWidth !== params.pulseWidth) ||
+        nodes.params.fifthIntensity !== params.fifthIntensity ||
+        nodes.params.octaveIntensity !== params.octaveIntensity) {
+      this.triggerOsc(id, params, 80);
+      return;
     }
+    
     nodes.params = params;
     const isInfinite = params.gateDuration === 'infinite';
-    const targetVol = isInfinite ? params.volume : params.volume * params.adsr.sustain;
+    // 如果是multi-saw模式，基础振荡器音量设为0
+    const baseVol = (params.waveform === 'sawtooth' && params.multiSaw) ? 0 : params.volume;
+    const targetVol = isInfinite ? baseVol : baseVol * params.adsr.sustain;
+    
+    // 更新基础振荡器
     nodes.fundamental.oscL.frequency.setTargetAtTime(params.frequency, now, 0.05);
     nodes.fundamental.oscR.frequency.setTargetAtTime(params.frequency + params.binauralBeat, now, 0.05);
     nodes.fundamental.gain.gain.setTargetAtTime(targetVol, now, 0.05);
+    
+    // 更新脉冲宽度（如果是square波形）
+    if (params.waveform === 'square' && params.pulseWidth !== 0.5) {
+      const pulseWave = this.createPulseWave(params.pulseWidth);
+      nodes.fundamental.oscL.setPeriodicWave(pulseWave);
+      nodes.fundamental.oscR.setPeriodicWave(pulseWave);
+    } else if (params.waveform !== 'square') {
+      nodes.fundamental.oscL.type = params.waveform;
+      nodes.fundamental.oscR.type = params.waveform;
+    }
+    
+    // 更新multi-saw组
+    if (nodes.multiSawGroups) {
+      const sawCount = nodes.multiSawGroups.length;
+      const detuneAmount = 0.1;
+      nodes.multiSawGroups.forEach((sg, i) => {
+        const detune = (i - (sawCount - 1) / 2) * detuneAmount;
+        const detunedFreq = params.frequency * Math.pow(2, detune / 12);
+        const sawVol = params.volume / sawCount;
+        const sawTargetVol = isInfinite ? sawVol : sawVol * params.adsr.sustain;
+        sg.oscL.frequency.setTargetAtTime(detunedFreq, now, 0.05);
+        sg.oscR.frequency.setTargetAtTime(detunedFreq + params.binauralBeat, now, 0.05);
+        sg.gain.gain.setTargetAtTime(sawTargetVol, now, 0.05);
+      });
+    }
+    
+    // 更新谐波
     nodes.harmonics.forEach((h, i) => {
       const n = i + 2;
       const hVol = params.volume * params.harmonicsIntensity * (1 / (n * 1.5));
@@ -610,6 +757,36 @@ class AudioEngine {
       h.oscR.frequency.setTargetAtTime(params.frequency * n + params.binauralBeat * (n/2), now, 0.05);
       h.gain.gain.setTargetAtTime(hTargetVol, now, 0.05);
     });
+    
+    // 更新五度音
+    if (nodes.fifthGroup) {
+      const fifthVol = params.volume * params.fifthIntensity;
+      const fifthTargetVol = isInfinite ? fifthVol : fifthVol * params.adsr.sustain;
+      nodes.fifthGroup.oscL.frequency.setTargetAtTime(params.frequency * 1.5, now, 0.05);
+      nodes.fifthGroup.oscR.frequency.setTargetAtTime(params.frequency * 1.5 + params.binauralBeat * 1.5, now, 0.05);
+      nodes.fifthGroup.gain.gain.setTargetAtTime(fifthTargetVol, now, 0.05);
+      if (params.waveform === 'square' && params.pulseWidth !== 0.5) {
+        const pulseWave = this.createPulseWave(params.pulseWidth);
+        nodes.fifthGroup.oscL.setPeriodicWave(pulseWave);
+        nodes.fifthGroup.oscR.setPeriodicWave(pulseWave);
+      }
+    }
+    
+    // 更新八度音
+    if (nodes.octaveGroup) {
+      const octaveVol = params.volume * params.octaveIntensity;
+      const octaveTargetVol = isInfinite ? octaveVol : octaveVol * params.adsr.sustain;
+      nodes.octaveGroup.oscL.frequency.setTargetAtTime(params.frequency * 2, now, 0.05);
+      nodes.octaveGroup.oscR.frequency.setTargetAtTime(params.frequency * 2 + params.binauralBeat * 2, now, 0.05);
+      nodes.octaveGroup.gain.gain.setTargetAtTime(octaveTargetVol, now, 0.05);
+      if (params.waveform === 'square' && params.pulseWidth !== 0.5) {
+        const pulseWave = this.createPulseWave(params.pulseWidth);
+        nodes.octaveGroup.oscL.setPeriodicWave(pulseWave);
+        nodes.octaveGroup.oscR.setPeriodicWave(pulseWave);
+      }
+    }
+    
+    // 更新LFO
     if (nodes.lfoNode && nodes.lfoGain) {
       nodes.lfoNode.type = params.lfo.waveform;
       let rate = params.lfo.isSynced ? (80 / 60) * params.lfo.rate : params.lfo.rate; 
@@ -625,6 +802,9 @@ class AudioEngine {
     const isInfinite = nodes.params.gateDuration === 'infinite';
     const effectiveRelease = isInfinite ? 0.2 : release;
     const groups = [nodes.fundamental, ...nodes.harmonics];
+    if (nodes.multiSawGroups) groups.push(...nodes.multiSawGroups);
+    if (nodes.fifthGroup) groups.push(nodes.fifthGroup);
+    if (nodes.octaveGroup) groups.push(nodes.octaveGroup);
     groups.forEach((g, i) => {
       const actualRelease = i === 0 ? effectiveRelease : effectiveRelease * (1 + nodes.params.harmonicsIntensity * 2);
       g.gain.gain.cancelScheduledValues(now);
@@ -650,9 +830,15 @@ class AudioEngine {
     this.activeChords = [];
     this.oscNodes.forEach((nodes) => {
       const groups = [nodes.fundamental, ...nodes.harmonics];
+      if (nodes.multiSawGroups) groups.push(...nodes.multiSawGroups);
+      if (nodes.fifthGroup) groups.push(nodes.fifthGroup);
+      if (nodes.octaveGroup) groups.push(nodes.octaveGroup);
       groups.forEach(g => {
         try { g.gain.gain.cancelScheduledValues(now); g.gain.gain.setTargetAtTime(0, now, 0.01); g.oscL.stop(now + 0.1); g.oscR.stop(now + 0.1); } catch(e) {}
       });
+      if (nodes.lfoNode) {
+        try { nodes.lfoNode.stop(); nodes.lfoNode.disconnect(); nodes.lfoGain?.disconnect(); } catch(e) {}
+      }
     });
     this.oscNodes.clear();
   }

@@ -42,7 +42,11 @@ export interface GeneratorParams {
   lfo: LFOConfig;
   gateDuration: GateDuration; 
   binauralBeat: number;
-  harmonicsIntensity: number; 
+  harmonicsIntensity: number;
+  multiSaw: boolean; // 是否使用multi-saw（仅sawtooth时有效）
+  pulseWidth: number; // 脉冲宽度 0-1（仅square时有效）
+  fifthIntensity: number; // 五度音强度 0-1
+  octaveIntensity: number; // 八度音强度 0-1
   active: boolean;
 }
 

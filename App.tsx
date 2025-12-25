@@ -59,7 +59,9 @@ const App: React.FC = () => {
     volume: 0.5,
     adsr: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.5 },
     lfo: { waveform: 'sine', rate: 1, depth: 10, active: false, isSynced: false },
-    gateDuration: '1', binauralBeat: 5, harmonicsIntensity: 0, active: false
+    gateDuration: '1', binauralBeat: 5, harmonicsIntensity: 0,
+    multiSaw: false, pulseWidth: 0.5, fifthIntensity: 0, octaveIntensity: 0,
+    active: false
   })));
   const [genEffects, setGenEffects] = useState(Array(3).fill(null).map(() => ({ reverb: 0.2, echo: 0.1 })));
   const [genActiveTab, setGenActiveTab] = useState<('OSC' | 'LFO' | 'ENV')[]>(['OSC', 'OSC', 'OSC']);

@@ -44,16 +44,26 @@ const GeneratorModule: React.FC<GeneratorModuleProps> = React.memo(({ idx, param
 
       <div className="flex-1 panel-inset rounded-sm border border-slate-800/40 p-2 overflow-hidden flex flex-col min-h-0">
         {activeTab === 'OSC' && (
-          <div className="flex flex-row items-center justify-between gap-2 h-full">
-            <div className="grid grid-cols-2 gap-1 w-20 shrink-0">
-              {['sine', 'square', 'sawtooth', 'triangle'].map(w => (
-                <button key={w} onClick={() => onUpdate({ waveform: w as WaveformType })} className={`h-4 rounded-[1.5px] flex items-center justify-center border text-[6px] font-bold transition-all ${params.waveform === w ? 'bg-sky-500 border-sky-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-700 hover:text-slate-500'}`}>{w.slice(0,3).toUpperCase()}</button>
-              ))}
+          <div className="flex flex-col gap-2 h-full">
+            <div className="flex flex-row items-center justify-between gap-2">
+              <div className="grid grid-cols-2 gap-1 w-20 shrink-0">
+                {['sine', 'square', 'sawtooth', 'triangle'].map(w => (
+                  <button key={w} onClick={() => onUpdate({ waveform: w as WaveformType })} className={`h-4 rounded-[1.5px] flex items-center justify-center border text-[6px] font-bold transition-all ${params.waveform === w ? 'bg-sky-500 border-sky-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-700 hover:text-slate-500'}`}>{w.slice(0,3).toUpperCase()}</button>
+                ))}
+              </div>
+              {params.waveform === 'sawtooth' && (
+                <button onClick={() => onUpdate({ multiSaw: !params.multiSaw })} className={`h-4 px-2 rounded-[1.5px] flex items-center justify-center border text-[6px] font-bold transition-all ${params.multiSaw ? 'bg-purple-500 border-purple-400 text-white' : 'bg-slate-900 border-slate-800 text-slate-700 hover:text-slate-500'}`}>M-SAW</button>
+              )}
             </div>
-            <div className="flex-1 flex flex-row items-center justify-around">
+            <div className="flex-1 flex flex-row items-center justify-around flex-wrap gap-2">
               <Knob label="Pitch" min={20} max={1000} value={params.frequency} onChange={(v) => onUpdate({ frequency: v, baseFrequency: v })} unit="Hz" size="sm" />
               <Knob label="Bin" min={0} max={20} value={params.binauralBeat} onChange={(v) => onUpdate({ binauralBeat: v })} unit="Hz" size="sm" />
               <Knob label="Harmon" min={0} max={1} value={params.harmonicsIntensity} onChange={(v) => onUpdate({ harmonicsIntensity: v })} size="sm" />
+              {params.waveform === 'square' && (
+                <Knob label="PW" min={0} max={1} value={params.pulseWidth} onChange={(v) => onUpdate({ pulseWidth: v })} size="sm" />
+              )}
+              <Knob label="5th" min={0} max={1} value={params.fifthIntensity} onChange={(v) => onUpdate({ fifthIntensity: v })} size="sm" />
+              <Knob label="8ve" min={0} max={1} value={params.octaveIntensity} onChange={(v) => onUpdate({ octaveIntensity: v })} size="sm" />
             </div>
           </div>
         )}
